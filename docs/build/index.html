@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Building PEPs Locally | peps.python.org</title>
+    <link rel="shortcut icon" href="../../_static/py.png"/>
+    <link rel="stylesheet" href="../../_static/style.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/mq.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/dark.css" type="text/css" media="(prefers-color-scheme: dark)" id="css-dark"/>
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" media="(prefers-color-scheme: light)" id="pyg" />
+    <link rel="stylesheet" href="../../_static/pygments_dark.css" type="text/css" media="(prefers-color-scheme: dark)" id="pyg-dark" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <meta name="description" content="Python Enhancement Proposals (PEPs)"/>
+</head>
+<body>
+    <section id="pep-page-section">
+        <header>
+            <h1>Python Enhancement Proposals</h1>
+            <ul class="breadcrumbs">
+                <li><a href="https://www.python.org/" title="The Python Programming Language">Python</a> &raquo; </li>
+                <li><a href="../../pep-0000/">PEP Index</a> &raquo; </li>
+                <li>Building PEPs Locally</li>
+            </ul>
+            <button onClick="toggleColourScheme()"></button>
+        </header>
+        <article>
+            <section id="building-peps-locally">
+<h1>Building PEPs Locally</h1>
+<p>Whilst editing a PEP, it is useful to review the rendered output locally.
+This can also be used to check that the PEP is valid reStructuredText before
+submission to the PEP editors.</p>
+<p>The rest of this document assumes you are working from a local clone of the
+<a class="reference external" href="https://github.com/python/peps">PEPs repository</a>, with Python 3.9 or later
+installed.</p>
+<section id="render-peps-locally">
+<h2>Render PEPs locally</h2>
+<ol class="arabic">
+<li>Create a virtual environment and install requirements.<p>The rest of these instructions assume an active virtual environment named
+<code class="docutils literal notranslate"><span class="pre">venv</span></code>.
+The Python Packaging User Guide contains
+<a class="reference external" href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#creating-a-virtual-environment">instructions on creating a virtual environment</a>
+for reference.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python -m pip install --upgrade pip
+<span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python -m pip install -r requirements.txt
+</pre></div>
+</div>
+</li>
+<li><strong>(Optional)</strong> Delete prior build files.
+Generally only needed when making changes to the rendering system itself.<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>rm -rf build
+</pre></div>
+</div>
+</li>
+<li>Run the build script:<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>make sphinx
+</pre></div>
+</div>
+<p>If you don’t have access to <code class="docutils literal notranslate"><span class="pre">make</span></code>, run:</p>
+<div class="highlight-ps1con notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">PS&gt; </span><span class="n">python</span> <span class="n">build</span><span class="p">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There may be a series of warnings about unreferenced citations or labels.
+Whilst these are valid warnings, they do not impact the build process.</p>
+</div>
+</li>
+<li>Navigate to the <code class="docutils literal notranslate"><span class="pre">build</span></code> directory of your PEPs repo to find the HTML pages.
+PEP 0 provides a formatted index, and may be a useful reference.</li>
+</ol>
+</section>
+<section id="build-py-tools">
+<h2><code class="docutils literal notranslate"><span class="pre">build.py</span></code> tools</h2>
+<p>Several additional tools can be run through <code class="docutils literal notranslate"><span class="pre">build.py</span></code>, or the Makefile.</p>
+<section id="check-links">
+<h3>Check links</h3>
+<p>Check the validity of links within PEP sources (runs the <a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/builders/index.html#sphinx.builders.linkcheck.CheckExternalLinksBuilder">Sphinx linkchecker</a>).</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python build.py --check-links
+<span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>make check-links
+</pre></div>
+</div>
+</section>
+<section id="stricter-rendering">
+<h3>Stricter rendering</h3>
+<p>Run in <a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-nitpicky">nit-picky</a>
+mode.
+This generates warnings for all missing references.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python build.py --nitpicky
+</pre></div>
+</div>
+<p>Fail the build on any warning.
+As of January 2022, there are around 250 warnings when building the PEPs.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python build.py --fail-on-warning
+<span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>make fail-warning
+</pre></div>
+</div>
+</section>
+</section>
+<section id="build-py-usage">
+<h2><code class="docutils literal notranslate"><span class="pre">build.py</span></code> usage</h2>
+<p>For details on the command-line options to the <code class="docutils literal notranslate"><span class="pre">build.py</span></code> script, run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp gp-VirtualEnv">(venv)</span> <span class="gp">$ </span>python build.py --help
+</pre></div>
+</div>
+</section>
+</section>
+
+        </article>
+        <nav id="pep-sidebar">
+            <h2>Contents</h2>
+            <p id="toc-title">Building PEPs Locally</p>
+            <ul>
+<li><a class="reference internal" href="#render-peps-locally">Render PEPs locally</a></li>
+<li><a class="reference internal" href="#build-py-tools"><code class="docutils literal notranslate"><span class="pre">build.py</span></code> tools</a><ul>
+<li><a class="reference internal" href="#check-links">Check links</a></li>
+<li><a class="reference internal" href="#stricter-rendering">Stricter rendering</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#build-py-usage"><code class="docutils literal notranslate"><span class="pre">build.py</span></code> usage</a></li>
+</ul>
+
+            <br />
+            <a id="source" href="https://github.com/python/peps/blob/main/docs/build.rst">Page Source (GitHub)</a>
+        </nav>
+    </section>
+    <script src="../../_static/colour_scheme.js"></script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>PEP 669 – Low Impact Monitoring for CPython | peps.python.org</title>
+    <link rel="shortcut icon" href="../_static/py.png"/>
+    <link rel="stylesheet" href="../_static/style.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/mq.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/dark.css" type="text/css" media="(prefers-color-scheme: dark)" id="css-dark"/>
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" media="(prefers-color-scheme: light)" id="pyg" />
+    <link rel="stylesheet" href="../_static/pygments_dark.css" type="text/css" media="(prefers-color-scheme: dark)" id="pyg-dark" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <meta name="description" content="Python Enhancement Proposals (PEPs)"/>
+</head>
+<body>
+    <section id="pep-page-section">
+        <header>
+            <h1>Python Enhancement Proposals</h1>
+            <ul class="breadcrumbs">
+                <li><a href="https://www.python.org/" title="The Python Programming Language">Python</a> &raquo; </li>
+                <li><a href="../pep-0000/">PEP Index</a> &raquo; </li>
+                <li>PEP 669 – Low Impact Monitoring for CPython</li>
+            </ul>
+            <button onClick="toggleColourScheme()"></button>
+        </header>
+        <article>
+            <section id="pep-content">
+<h1 class="page-title">PEP 669 – Low Impact Monitoring for CPython</h1>
+<dl class="rfc2822 field-list simple">
+<dt class="field-odd">PEP</dt>
+<dd class="field-odd">669</dd>
+<dt class="field-even">Title</dt>
+<dd class="field-even">Low Impact Monitoring for CPython</dd>
+<dt class="field-odd">Author</dt>
+<dd class="field-odd">Mark Shannon &lt;mark&#32;&#97;t&#32;hotpy.org&gt;</dd>
+<dt class="field-even">Status</dt>
+<dd class="field-even">Draft</dd>
+<dt class="field-odd">Type</dt>
+<dd class="field-odd">Standards Track</dd>
+<dt class="field-even">Created</dt>
+<dd class="field-even">18-Aug-2021</dd>
+<dt class="field-odd">Post-History</dt>
+<dd class="field-odd">7-Dec-2021</dd>
+</dl>
+<hr class="docutils" />
+<section id="contents">
+<h2>Contents</h2>
+<ul class="simple">
+<li><a class="reference internal" href="#abstract">Abstract</a></li>
+<li><a class="reference internal" href="#motivation">Motivation</a></li>
+<li><a class="reference internal" href="#rationale">Rationale</a></li>
+<li><a class="reference internal" href="#specification">Specification</a><ul>
+<li><a class="reference internal" href="#events">Events</a></li>
+<li><a class="reference internal" href="#setting-events-globally">Setting events globally</a></li>
+<li><a class="reference internal" href="#per-code-object-events">Per code object events</a></li>
+<li><a class="reference internal" href="#register-callback-functions">Register callback functions</a><ul>
+<li><a class="reference internal" href="#callback-function-arguments">Callback function arguments</a></li>
+<li><a class="reference internal" href="#inserting-and-removing-markers">Inserting and removing markers</a></li>
+<li><a class="reference internal" href="#attributes-of-the-sys-monitoring-namespace">Attributes of the <code class="docutils literal notranslate"><span class="pre">sys.monitoring</span></code> namespace</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#backwards-compatibility">Backwards Compatibility</a><ul>
+<li><a class="reference internal" href="#performance">Performance</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#security-implications">Security Implications</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a></li>
+<li><a class="reference internal" href="#implementing-tools">Implementing tools</a><ul>
+<li><a class="reference internal" href="#debuggers">Debuggers</a><ul>
+<li><a class="reference internal" href="#inserting-breakpoints">Inserting breakpoints</a></li>
+<li><a class="reference internal" href="#stepping">Stepping</a></li>
+<li><a class="reference internal" href="#attaching">Attaching</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#coverage-tools">Coverage Tools</a></li>
+<li><a class="reference internal" href="#profilers">Profilers</a><ul>
+<li><a class="reference internal" href="#line-based-profilers">Line based profilers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#rejected-ideas">Rejected ideas</a></li>
+<li><a class="reference internal" href="#copyright">Copyright</a></li>
+</ul>
+</section>
+<section id="abstract">
+<h2><a class="toc-backref" href="#abstract">Abstract</a></h2>
+<p>Using a profiler or debugger in CPython can have a severe impact on
+performance. Slowdowns by an order of magnitude are common.</p>
+<p>This PEP proposes an API for monitoring of Python programs running
+on CPython that will enable monitoring at low cost.</p>
+<p>Although this PEP does not specify an implementation, it is expected that
+it will be implemented using the quickening step of
+<span class="target" id="index-0"></span><a class="pep reference external" href="../pep-0659#quickening"><strong>PEP 659</strong></a>.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">sys.monitoring</span></code> namespace will be added, which will contain
+the relevant functions and enum.</p>
+</section>
+<section id="motivation">
+<h2><a class="toc-backref" href="#motivation">Motivation</a></h2>
+<p>Developers should not have to pay an unreasonable cost to use debuggers,
+profilers and other similar tools.</p>
+<p>C++ and Java developers expect to be able to run a program at full speed
+(or very close to it) under a debugger.
+Python developers should expect that too.</p>
+</section>
+<section id="rationale">
+<h2><a class="toc-backref" href="#rationale">Rationale</a></h2>
+<p>The quickening mechanism provided by <span class="target" id="index-1"></span><a class="pep reference external" href="../pep-0659"><strong>PEP 659</strong></a> provides a way to dynamically
+modify executing Python bytecode. These modifications have little cost beyond
+the parts of the code that are modified and a relatively low cost to those
+parts that are modified. We can leverage this to provide an efficient
+mechanism for monitoring that was not possible in 3.10 or earlier.</p>
+<p>By using quickening, we expect that code run under a debugger on 3.11
+should easily outperform code run without a debugger on 3.10.
+Profiling will still slow down execution, but by much less than in 3.10.</p>
+</section>
+<section id="specification">
+<h2><a class="toc-backref" href="#specification">Specification</a></h2>
+<p>Monitoring of Python programs is done by registering callback functions
+for events and by activating a set of events.</p>
+<p>Activating events and registering callback functions are independent of each other.</p>
+<section id="events">
+<h3><a class="toc-backref" href="#events">Events</a></h3>
+<p>As a code object executes various events occur that might be of interest
+to tools. By activating events and by registering callback functions
+tools can respond to these events in any way that suits them.
+Events can be set globally, or for individual code objects.</p>
+<p>For 3.11, CPython will support the following events:</p>
+<ul class="simple">
+<li>PY_CALL: Call of a Python function (occurs immediately after the call, the callee’s frame will be on the stack)</li>
+<li>PY_RESUME: Resumption of a Python function (for generator and coroutine functions), except for throw() calls.</li>
+<li>PY_THROW: A Python function is resumed by a throw() call.</li>
+<li>PY_RETURN: Return from a Python function (occurs immediately before the return, the callee’s frame will be on the stack).</li>
+<li>PY_YIELD: Yield from a Python function (occurs immediately before the yield, the callee’s frame will be on the stack).</li>
+<li>PY_UNWIND:  Exit from a Python function during exception unwinding.</li>
+<li>C_CALL: Call of a builtin function (before the call in this case).</li>
+<li>C_RETURN: Return from a builtin function (after the return in this case).</li>
+<li>RAISE: An exception is raised.</li>
+<li>EXCEPTION_HANDLED: An exception is handled.</li>
+<li>LINE: An instruction is about to be executed that has a different line number from the preceding instruction.</li>
+<li>INSTRUCTION – A VM instruction is about to be executed.</li>
+<li>JUMP – An unconditional jump in the control flow graph is reached.</li>
+<li>BRANCH – A conditional branch is about to be taken (or not).</li>
+<li>MARKER – A marker is hit</li>
+</ul>
+<p>More events may be added in the future.</p>
+<p>All events will be attributes of the <code class="docutils literal notranslate"><span class="pre">Event</span></code> enum in <code class="docutils literal notranslate"><span class="pre">sys.monitoring</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Event</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">IntFlag</span><span class="p">):</span>
+    <span class="n">PY_CALL</span> <span class="o">=</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">Event</span></code> is an <code class="docutils literal notranslate"><span class="pre">IntFlag</span></code> which means that the events can be or-ed
+together to form a set of events.</p>
+</section>
+<section id="setting-events-globally">
+<h3><a class="toc-backref" href="#setting-events-globally">Setting events globally</a></h3>
+<p>Events can be controlled globally by modifying the set of events being monitored:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.get_events()-&gt;Event</span></code>
+Returns the <code class="docutils literal notranslate"><span class="pre">Event</span></code> set for all the active events.</li>
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_events(event_set:</span> <span class="pre">Event)</span></code>
+Activates all events which are set in <code class="docutils literal notranslate"><span class="pre">event_set</span></code>.</li>
+</ul>
+<p>No events are active by default.</p>
+</section>
+<section id="per-code-object-events">
+<h3><a class="toc-backref" href="#per-code-object-events">Per code object events</a></h3>
+<p>Events can also be controlled on a per code object basis:</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.get_local_events(code:</span> <span class="pre">CodeType)-&gt;Event</span></code>
+Returns the <code class="docutils literal notranslate"><span class="pre">Event</span></code> set for all the local events for <code class="docutils literal notranslate"><span class="pre">code</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_local_events(code:</span> <span class="pre">CodeType,</span> <span class="pre">event_set:</span> <span class="pre">Event)</span></code>
+Activates all the local events for <code class="docutils literal notranslate"><span class="pre">code</span></code>  which are set in <code class="docutils literal notranslate"><span class="pre">event_set</span></code>.</li>
+</ul>
+<p>Local events add to global events, but do not mask them.
+In other words, all global events will trigger for a code object, regardless of the local events.</p>
+</section>
+<section id="register-callback-functions">
+<h3><a class="toc-backref" href="#register-callback-functions">Register callback functions</a></h3>
+<p>To register a callable for events call:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sys</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">register_callback</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">func</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">register_callback</span></code> returns the previously registered callback, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>Functions can be unregistered by calling
+<code class="docutils literal notranslate"><span class="pre">sys.monitoring.register_callback(event,</span> <span class="pre">None)</span></code>.</p>
+<p>Callback functions can be registered and unregistered at any time.</p>
+<p>Registering a callback function will generate a <code class="docutils literal notranslate"><span class="pre">sys.audit</span></code> event.</p>
+<section id="callback-function-arguments">
+<h4><a class="toc-backref" href="#callback-function-arguments">Callback function arguments</a></h4>
+<p>When an active event occurs, the registered callback function is called.
+Different events will provide the callback function with different arguments, as follows:</p>
+<ul>
+<li>All events starting with <code class="docutils literal notranslate"><span class="pre">PY_</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int)</span></code></div></blockquote>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">C_CALL</span></code> and <code class="docutils literal notranslate"><span class="pre">C_RETURN</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int,</span> <span class="pre">callable:</span> <span class="pre">object)</span></code></div></blockquote>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">RAISE</span></code> and <code class="docutils literal notranslate"><span class="pre">EXCEPTION_HANDLED</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int,</span> <span class="pre">exception:</span> <span class="pre">BaseException)</span></code></div></blockquote>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">LINE</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">line_number:</span> <span class="pre">int)</span></code></div></blockquote>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">JUMP</span></code> and <code class="docutils literal notranslate"><span class="pre">BRANCH</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int,</span> <span class="pre">destination_offset:</span> <span class="pre">int)</span></code></div></blockquote>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">destination_offset</span></code> is where the code will next execute.
+For an untaken branch this will be the offset of the instruction following
+the branch.</p>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">INSTRUCTION</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int)</span></code></div></blockquote>
+</li>
+<li><code class="docutils literal notranslate"><span class="pre">MARKER</span></code>:<blockquote>
+<div><code class="docutils literal notranslate"><span class="pre">func(code:</span> <span class="pre">CodeType,</span> <span class="pre">instruction_offset:</span> <span class="pre">int,</span> <span class="pre">marker_id:</span> <span class="pre">int)</span></code></div></blockquote>
+</li>
+</ul>
+</section>
+<section id="inserting-and-removing-markers">
+<h4><a class="toc-backref" href="#inserting-and-removing-markers">Inserting and removing markers</a></h4>
+<p>Two new functions are added to the <code class="docutils literal notranslate"><span class="pre">sys</span></code> module to support markers.</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.insert_marker(code:</span> <span class="pre">CodeType,</span> <span class="pre">offset:</span> <span class="pre">int,</span> <span class="pre">marker_id=0:</span> <span class="pre">range(256))</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">sys.monitoring.remove_marker(code:</span> <span class="pre">CodeType,</span> <span class="pre">offset:</span> <span class="pre">int)</span></code></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">marker_id</span></code> has no meaning to the VM,
+and is used only as an argument to the callback function.
+The <code class="docutils literal notranslate"><span class="pre">marker_id</span></code> must in the range 0 to 255 (inclusive).</p>
+</section>
+<section id="attributes-of-the-sys-monitoring-namespace">
+<h4><a class="toc-backref" href="#attributes-of-the-sys-monitoring-namespace">Attributes of the <code class="docutils literal notranslate"><span class="pre">sys.monitoring</span></code> namespace</a></h4>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">class</span> <span class="pre">Event(enum.IntFlag)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">get_events()-&gt;Event</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">set_events(event_set:</span> <span class="pre">Event)-&gt;None</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">get_local_events(code:</span> <span class="pre">CodeType)-&gt;Event</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">set_local_events(code:</span> <span class="pre">CodeType,</span> <span class="pre">event_set:</span> <span class="pre">Event)-&gt;None</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">register_callback(event:</span> <span class="pre">Event,</span> <span class="pre">func:</span> <span class="pre">Callable)-&gt;Optional[Callable]</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">insert_marker(code:</span> <span class="pre">CodeType,</span> <span class="pre">offset:</span> <span class="pre">Event,</span> <span class="pre">marker_id=0:</span> <span class="pre">range(256))-&gt;None</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">def</span> <span class="pre">remove_marker(code:</span> <span class="pre">CodeType,</span> <span class="pre">offset:</span> <span class="pre">Event)-&gt;None</span></code></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="backwards-compatibility">
+<h2><a class="toc-backref" href="#backwards-compatibility">Backwards Compatibility</a></h2>
+<p>This PEP is fully backwards compatible, in the sense that old code
+will work if the features of this PEP are unused.</p>
+<p>However, if it is used it will effectively disable <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code>,
+<code class="docutils literal notranslate"><span class="pre">sys.setprofile</span></code> and <span class="target" id="index-2"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a> frame evaluation.</p>
+<p>If <span class="target" id="index-3"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a> is in use, or <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> or <code class="docutils literal notranslate"><span class="pre">sys.setprofile</span></code> has been
+set, then calling <code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_events()</span></code> or
+<code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_local_events()</span></code> will raise an exception.</p>
+<p>Likewise, if <code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_events()</span></code> or
+<code class="docutils literal notranslate"><span class="pre">sys.monitoring.set_local_events()</span></code> has been called, then using <span class="target" id="index-4"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a>
+or calling <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> or <code class="docutils literal notranslate"><span class="pre">sys.setprofile</span></code> will raise an exception.</p>
+<p>This PEP is incompatible with <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> and <code class="docutils literal notranslate"><span class="pre">sys.setprofile</span></code>
+because the implementation of <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> and <code class="docutils literal notranslate"><span class="pre">sys.setprofile</span></code>
+will use the same underlying mechanism as this PEP. It would be too slow
+to support both the new and old monitoring mechanisms at the same time,
+and they would interfere in awkward ways if both were active at the same time.</p>
+<p>This PEP is incompatible with <span class="target" id="index-5"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a>, because <span class="target" id="index-6"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a> prevents the VM being
+able to modify the code objects of executing code, which is a necessary feature.</p>
+<p>We may seek to remove <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> and <span class="target" id="index-7"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a> in the future once the APIs
+provided by this PEP have been widely adopted, but that is for another PEP.</p>
+<section id="performance">
+<h3><a class="toc-backref" href="#performance">Performance</a></h3>
+<p>If no events are active, this PEP should have a negligible impact on
+performance.</p>
+<p>If a small set of events are active, e.g. for a debugger, then the overhead
+of callbacks will be orders of magnitudes less than for <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code> and
+much cheaper than using <span class="target" id="index-8"></span><a class="pep reference external" href="../pep-0523"><strong>PEP 523</strong></a>.</p>
+<p>For heavily instrumented code, e.g. using <code class="docutils literal notranslate"><span class="pre">LINE</span></code>, performance should be
+better than <code class="docutils literal notranslate"><span class="pre">sys.settrace</span></code>, but not by that much as performance will be
+dominated by the time spent in callbacks.</p>
+<p>For optimizing virtual machines, such as future versions of CPython
+(and <code class="docutils literal notranslate"><span class="pre">PyPy</span></code> should they choose to support this API), changing the set of
+globally active events in the midst of a long running program could be quite
+expensive, possibly taking hundreds of milliseconds as it triggers
+de-optimizations. Once such de-optimization has occurred, performance should
+recover as the VM can re-optimize the instrumented code.</p>
+</section>
+</section>
+<section id="security-implications">
+<h2><a class="toc-backref" href="#security-implications">Security Implications</a></h2>
+<p>Allowing modification of running code has some security implications,
+but no more than the ability to generate and call new code.</p>
+<p>All the new functions listed above will trigger audit hooks.</p>
+</section>
+<section id="implementation">
+<h2><a class="toc-backref" href="#implementation">Implementation</a></h2>
+<p>This outlines the proposed implementation for CPython 3.11. The actual
+implementation for later versions of CPython and other Python implementations
+may differ considerably.</p>
+<p>The proposed implementation of this PEP will be built on top of the quickening
+step of <span class="target" id="index-9"></span><a class="pep reference external" href="../pep-0659#quickening"><strong>PEP 659</strong></a>.
+Activating some events will cause all code objects to
+be quickened before they are executed.</p>
+<p>For example, if the <code class="docutils literal notranslate"><span class="pre">LINE</span></code> event is turned on, then all instructions that
+are at the start of a line will be replaced with a <code class="docutils literal notranslate"><span class="pre">LINE_EVENT</span></code> instruction.</p>
+<p>Note that this will interfere with specialization, which will result in some
+performance degradation in addition to the overhead of calling the
+registered callable.</p>
+<p>When the set of active events changes, the VM will immediately update
+all code objects present on the call stack of any thread. It will also set in
+place traps to ensure that all code objects are correctly instrumented when
+called. Consequently changing the set of active events should be done as
+infrequently as possible, as it could be quite an expensive operation.</p>
+<p>Other events, such as <code class="docutils literal notranslate"><span class="pre">RAISE</span></code> can be turned on or off cheaply,
+as they do not rely on code instrumentation, but runtime checks when the
+underlying event occurs.</p>
+<p>The exact set of events that require instrumentation is an implementation detail,
+but for the current design, the following events will require instrumentation:</p>
+<ul class="simple">
+<li>PY_CALL</li>
+<li>PY_RESUME</li>
+<li>PY_RETURN</li>
+<li>PY_YIELD</li>
+<li>C_CALL</li>
+<li>C_RETURN</li>
+<li>LINE</li>
+<li>INSTRUCTION</li>
+<li>JUMP</li>
+<li>BRANCH</li>
+</ul>
+</section>
+<section id="implementing-tools">
+<h2><a class="toc-backref" href="#implementing-tools">Implementing tools</a></h2>
+<p>It is the philosophy of this PEP that it should be possible for third-party monitoring
+tools to achieve high-performance, not that it should be easy for them to do so.</p>
+<p>Converting events into data that is meaningful to the users is
+the responsibility of the tool.</p>
+<p>All events have a cost, and tools should attempt to the use set of events
+that trigger the least often and still provide the necessary information.</p>
+<section id="debuggers">
+<h3><a class="toc-backref" href="#debuggers">Debuggers</a></h3>
+<section id="inserting-breakpoints">
+<h4><a class="toc-backref" href="#inserting-breakpoints">Inserting breakpoints</a></h4>
+<p>Breakpoints can be inserted by using markers. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sys</span><span class="o">.</span><span class="n">insert_marker</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Which will insert a marker at <code class="docutils literal notranslate"><span class="pre">offset</span></code> in <code class="docutils literal notranslate"><span class="pre">code</span></code>,
+which can be used as a breakpoint.</p>
+<p>To insert a breakpoint at a given line, the matching instruction offsets
+should be found from <code class="docutils literal notranslate"><span class="pre">code.co_lines()</span></code>.</p>
+<p>Breakpoints can be removed by removing the marker:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sys</span><span class="o">.</span><span class="n">remove_marker</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="stepping">
+<h4><a class="toc-backref" href="#stepping">Stepping</a></h4>
+<p>Debuggers usually offer the ability to step execution by a
+single instruction or line.</p>
+<p>This can be implemented by inserting a new marker at the required
+offset(s) of the code to be stepped to,
+and by removing the current marker.</p>
+<p>It is the job of the debugger to compute the relevant offset(s).</p>
+</section>
+<section id="attaching">
+<h4><a class="toc-backref" href="#attaching">Attaching</a></h4>
+<p>Debuggers can use the <code class="docutils literal notranslate"><span class="pre">PY_CALL</span></code>, etc. events to be informed when
+a code object is first encountered, so that any necessary breakpoints
+can be inserted.</p>
+</section>
+</section>
+<section id="coverage-tools">
+<h3><a class="toc-backref" href="#coverage-tools">Coverage Tools</a></h3>
+<p>Coverage tools need to track which parts of the control graph have been
+executed. To do this, they need to register for the <code class="docutils literal notranslate"><span class="pre">PY_</span></code> events,
+plus <code class="docutils literal notranslate"><span class="pre">JUMP</span></code> and <code class="docutils literal notranslate"><span class="pre">BRANCH</span></code>.</p>
+<p>This information can be then be converted back into a line based report
+after execution has completed.</p>
+</section>
+<section id="profilers">
+<h3><a class="toc-backref" href="#profilers">Profilers</a></h3>
+<p>Simple profilers need to gather information about calls.
+To do this profilers should register for the following events:</p>
+<ul class="simple">
+<li>PY_CALL</li>
+<li>PY_RESUME</li>
+<li>PY_THROW</li>
+<li>PY_RETURN</li>
+<li>PY_YIELD</li>
+<li>PY_UNWIND</li>
+<li>C_CALL</li>
+<li>C_RETURN</li>
+</ul>
+<section id="line-based-profilers">
+<h4><a class="toc-backref" href="#line-based-profilers">Line based profilers</a></h4>
+<p>Line based profilers can use the <code class="docutils literal notranslate"><span class="pre">LINE</span></code> and <code class="docutils literal notranslate"><span class="pre">JUMP</span></code> events.
+Implementers of profilers should be aware that instrumenting <code class="docutils literal notranslate"><span class="pre">LINE</span></code>
+and <code class="docutils literal notranslate"><span class="pre">JUMP</span></code> events will have a large impact on performance.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Instrumenting profilers have significant overhead and will distort
+the results of profiling. Unless you need exact call counts,
+consider using a statistical profiler.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="rejected-ideas">
+<h2><a class="toc-backref" href="#rejected-ideas">Rejected ideas</a></h2>
+<p>A draft version of this PEP proposed making the user responsible
+for inserting the monitoring instructions, rather than have VM do it.
+However, that puts too much of a burden on the tools, and would make
+attaching a debugger nearly impossible.</p>
+</section>
+<section id="copyright">
+<h2><a class="toc-backref" href="#copyright">Copyright</a></h2>
+<p>This document is placed in the public domain or under the
+CC0-1.0-Universal license, whichever is more permissive.</p>
+</section>
+</section>
+<hr class="docutils" />
+<p>Source: <a class="reference external" href="https://github.com/python/peps/blob/main/pep-0669.rst">https://github.com/python/peps/blob/main/pep-0669.rst</a></p>
+<p>Last modified: <a class="reference external" href="https://github.com/python/peps/commits/main/pep-0669.rst">2022-01-21 11:03:51 GMT</a></p>
+
+        </article>
+        <nav id="pep-sidebar">
+            <h2>Contents</h2>
+            <p id="toc-title">PEP 669 – Low Impact Monitoring for CPython</p>
+            <ul>
+<li><a class="reference internal" href="#contents">Contents</a></li>
+<li><a class="reference internal" href="#abstract">Abstract</a></li>
+<li><a class="reference internal" href="#motivation">Motivation</a></li>
+<li><a class="reference internal" href="#rationale">Rationale</a></li>
+<li><a class="reference internal" href="#specification">Specification</a><ul>
+<li><a class="reference internal" href="#events">Events</a></li>
+<li><a class="reference internal" href="#setting-events-globally">Setting events globally</a></li>
+<li><a class="reference internal" href="#per-code-object-events">Per code object events</a></li>
+<li><a class="reference internal" href="#register-callback-functions">Register callback functions</a><ul>
+<li><a class="reference internal" href="#callback-function-arguments">Callback function arguments</a></li>
+<li><a class="reference internal" href="#inserting-and-removing-markers">Inserting and removing markers</a></li>
+<li><a class="reference internal" href="#attributes-of-the-sys-monitoring-namespace">Attributes of the <code class="docutils literal notranslate"><span class="pre">sys.monitoring</span></code> namespace</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#backwards-compatibility">Backwards Compatibility</a><ul>
+<li><a class="reference internal" href="#performance">Performance</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#security-implications">Security Implications</a></li>
+<li><a class="reference internal" href="#implementation">Implementation</a></li>
+<li><a class="reference internal" href="#implementing-tools">Implementing tools</a><ul>
+<li><a class="reference internal" href="#debuggers">Debuggers</a><ul>
+<li><a class="reference internal" href="#inserting-breakpoints">Inserting breakpoints</a></li>
+<li><a class="reference internal" href="#stepping">Stepping</a></li>
+<li><a class="reference internal" href="#attaching">Attaching</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#coverage-tools">Coverage Tools</a></li>
+<li><a class="reference internal" href="#profilers">Profilers</a><ul>
+<li><a class="reference internal" href="#line-based-profilers">Line based profilers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#rejected-ideas">Rejected ideas</a></li>
+<li><a class="reference internal" href="#copyright">Copyright</a></li>
+</ul>
+
+            <br />
+            <a id="source" href="https://github.com/python/peps/blob/main/pep-0669.rst">Page Source (GitHub)</a>
+        </nav>
+    </section>
+    <script src="../_static/colour_scheme.js"></script>
+</body>
+</html>
